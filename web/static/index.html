@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlayNESTI 26 — Wall</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c8102e;
+    --red-dim: rgba(200, 16, 46, 0.15);
+    --bg: #080808;
+    --surface: #111;
+    --text: #f0ece8;
+    --muted: #555;
+    --fade: 550ms ease;
+  }
+
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* ─── IDLE SCREEN ─── */
+  #idle {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: var(--bg);
+    z-index: 10;
+    transition: opacity var(--fade);
+  }
+
+  #idle.out { opacity: 0; pointer-events: none; }
+
+  .idle-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(4rem, 10vw, 9rem);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .idle-logo em {
+    color: var(--red);
+    font-style: normal;
+  }
+
+  .idle-sub {
+    font-size: 0.85rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .idle-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--red);
+    border-radius: 50%;
+    animation: blink 1.4s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.2; transform: scale(0.6); }
+  }
+
+  /* ─── SLIDE ─── */
+  #slide {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity var(--fade);
+    background: var(--bg);
+  }
+
+  #slide.visible { opacity: 1; }
+
+  #media-wrap {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #media-wrap img,
+  #media-wrap video {
+    max-width: 100vw;
+    max-height: 100vh;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* ─── CAPTION ─── */
+  #caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 48px 36px 24px;
+    background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 100%);
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .caption-bar {
+    width: 3px;
+    height: 40px;
+    background: var(--red);
+    flex-shrink: 0;
+    border-radius: 2px;
+  }
+
+  .caption-text { display: flex; flex-direction: column; gap: 3px; }
+
+  #cap-author {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.08em;
+    color: var(--red);
+    line-height: 1;
+  }
+
+  #cap-msg {
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: var(--text);
+    opacity: 0.8;
+    max-width: 70vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ─── PROGRESS BAR ─── */
+  #progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    background: var(--red);
+    box-shadow: 0 0 12px var(--red);
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ─── QUEUE BADGE ─── */
+  #queue-badge {
+    position: fixed;
+    top: 18px;
+    right: 20px;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #222;
+    border-radius: 20px;
+    padding: 5px 12px;
+    display: none;
+    z-index: 20;
+  }
+
+  #queue-badge.visible { display: block; }
+
+  /* ─── CORNER BRAND ─── */
+  #corner {
+    position: fixed;
+    top: 18px;
+    left: 20px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    z-index: 20;
+    opacity: 0.5;
+  }
+
+  #corner span { color: var(--red); opacity: 1; }
+
+  /* ─── WS STATUS DOT ─── */
+  #ws-dot {
+    position: fixed;
+    bottom: 14px;
+    right: 16px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #333;
+    z-index: 20;
+    transition: background 0.4s;
+  }
+
+  #ws-dot.connected { background: #2ecc71; }
+  #ws-dot.error { background: var(--red); }
+</style>
+</head>
+<body>
+
+<div id="corner">Play<span>NESTI</span> 26</div>
+
+<div id="idle">
+  <div class="idle-logo">Play<em>NESTI</em></div>
+  <div class="idle-sub">A aguardar conteúdo</div>
+  <div class="idle-dot"></div>
+</div>
+
+<div id="slide">
+  <div id="media-wrap"></div>
+  <div id="caption">
+    <div class="caption-bar"></div>
+    <div class="caption-text">
+      <span id="cap-author"></span>
+      <span id="cap-msg"></span>
+    </div>
+  </div>
+  <div id="progress"></div>
+</div>
+
+<div id="queue-badge"></div>
+<div id="ws-dot"></div>
+
+<script>
+const IMAGE_DURATION = 5000;
+const FADE_MS = 550;
+
+const slideEl    = document.getElementById('slide');
+const idleEl     = document.getElementById('idle');
+const mediaWrap  = document.getElementById('media-wrap');
+const capAuthor  = document.getElementById('cap-author');
+const capMsg     = document.getElementById('cap-msg');
+const progressEl = document.getElementById('progress');
+const badge      = document.getElementById('queue-badge');
+const wsDot      = document.getElementById('ws-dot');
+
+const queue = [];
+let running = false;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function updateBadge() {
+  if (queue.length > 0) {
+    badge.textContent = `+${queue.length} em fila`;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+async function showIdle(show) {
+  if (show) {
+    idleEl.classList.remove('out');
+  } else {
+    idleEl.classList.add('out');
+  }
+}
+
+async function fadeIn() {
+  slideEl.classList.add('visible');
+  await sleep(FADE_MS);
+}
+
+async function fadeOut() {
+  slideEl.classList.remove('visible');
+  await sleep(FADE_MS);
+}
+
+function startProgress(duration) {
+  progressEl.style.transition = 'none';
+  progressEl.style.width = '0%';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    progressEl.style.transition = `width ${duration}ms linear`;
+    progressEl.style.width = '100%';
+  }));
+}
+
+function buildMedia(item) {
+  mediaWrap.innerHTML = '';
+
+  if (item.type === 'image') {
+    const img = document.createElement('img');
+    img.src = item.url;
+    mediaWrap.appendChild(img);
+    return null;
+  }
+
+  const vid = document.createElement('video');
+  vid.src = item.url;
+  vid.autoplay = true;
+  vid.playsInline = true;
+  vid.controls = false;
+  mediaWrap.appendChild(vid);
+  return vid;
+}
+
+function waitForItem(item, vid) {
+  return new Promise(resolve => {
+    if (item.type === 'image') {
+      startProgress(IMAGE_DURATION);
+      setTimeout(resolve, IMAGE_DURATION);
+      return;
+    }
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    vid.addEventListener('ended', finish, { once: true });
+    vid.addEventListener('error', finish, { once: true });
+    setTimeout(finish, 120_000);
+    vid.play().catch(finish);
+  });
+}
+
+async function displayItem(item) {
+  const vid = buildMedia(item);
+
+  capAuthor.textContent = item.author || '';
+  capMsg.textContent = item.text || '';
+  capMsg.style.display = item.text ? '' : 'none';
+
+  await showIdle(false);
+  await fadeIn();
+  await waitForItem(item, vid);
+  await fadeOut();
+}
+
+async function runQueue() {
+  if (running) return;
+  running = true;
+
+  while (queue.length > 0) {
+    updateBadge();
+    await displayItem(queue.shift());
+  }
+
+  running = false;
+  updateBadge();
+  showIdle(true);
+}
+
+function addItems(items) {
+  queue.push(...items);
+  updateBadge();
+  if (!running) runQueue();
+}
+
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+
+  ws.onopen = () => wsDot.className = 'connected';
+
+  ws.onmessage = ({ data }) => {
+    const msg = JSON.parse(data);
+    if (msg.type === 'init' || msg.type === 'add') addItems(msg.items);
+  };
+
+  ws.onclose = () => {
+    wsDot.className = 'error';
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+connect();
+</script>
+</body>
+</html>
