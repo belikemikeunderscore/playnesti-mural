@@ -89,7 +89,7 @@ class GameSelectView(discord.ui.View):
             pass
         
         # Get game config and role mention
-        game_config = GAMES.get(game, {"emoji": "🎮", "color": discord.Color.blurple()})
+        game_config = GAMES.get(game, {"emoji": "🎮", "color": discord.Color.red()})
         role_mention = self.get_role_mention(interaction.guild, game)
         
         announcement_embed = discord.Embed(
@@ -137,7 +137,7 @@ class LFTCog(commands.Cog):
         embed = discord.Embed(
             title="🎮 Para qual jogo estás à procura de equipa?",
             description="Clica num botão abaixo; o anúncio será enviado depois de clicares.",
-            color=discord.Color.blurple(),
+            color=discord.Color.red(),
             timestamp=discord.utils.utcnow()
         )
         embed.set_footer(text="Escolhe um jogo para continuar")
