@@ -38,8 +38,8 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     state = request.app["state"]
     state.ws_clients.add(ws)
 
-    if state.media_items:
-        await ws.send_json({"type": "init", "items": state.media_items})
+    # Always send initial state (may be empty) so the moderation UI can render immediately
+    await ws.send_json({"type": "init", "items": state.media_items})
 
     async for msg in ws:
         if msg.type == WSMsgType.TEXT:

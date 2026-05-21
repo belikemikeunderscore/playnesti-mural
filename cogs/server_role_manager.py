@@ -48,6 +48,7 @@ from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands
 
 # ── Flask (dashboard web) ──────────────────────────────────────────────────────
 try:
@@ -1114,6 +1115,10 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
         self._load_data()
         if FLASK_AVAILABLE:
             self._start_dashboard()
+    
+    async def cog_load(self):
+        """Called when cog is loaded."""
+        log.info("[PlayNESTI] Cog loaded with slash commands.")
 
     # ── Persistência ──────────────────────────────────────────────────────────
 
@@ -1219,84 +1224,36 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
         self.created_roles.setdefault(guild.id, []).append(role.id)
         return role
 
-    # ── Grupo de comandos ─────────────────────────────────────────────────────
+    # ── Slash Commands ───────────────────────────────────────────────────────
 
-    @commands.group(name="discord", invoke_without_command=True)
-    @commands.has_permissions(manage_roles=True)
-    async def playnesti(self, ctx: commands.Context):
-        """Comandos PlayNESTI Discord Manager."""
-        embed = discord.Embed(
-            title="🎮 PlayNESTI Discord Manager — Comandos",
-            color=discord.Color.blurple(),
-        )
-        cmds = {
-            "carregar <ficheiro.csv>": "Carrega o CSV enviado em anexo",
-            "status":                  "Mostra resumo das equipas",
-            "criar_cargos":            "Cria e atribui cargos automaticamente",
-            "dashboard":               "Mostra o URL do dashboard web",
-            "limpar":                  "Remove todos os cargos criados pelo bot",
-        }
-        for cmd, desc in cmds.items():
-            embed.add_field(name=f"`!discord {cmd}`", value=desc, inline=False)
-        await ctx.send(embed=embed)
+    playnesti_group = app_commands.Group(
+        name="playnesti",
+        description="Comandos de gestão PlayNESTI LAN Party",
+        default_permissions=discord.Permissions(manage_roles=True)
+    )
 
-    # ── !playnesti carregar ────────────────────────────────────────────────────
-
-    @playnesti.command(name="carregar")
-    @commands.has_permissions(manage_roles=True)
-    async def carregar(self, ctx: commands.Context):
+    @playnesti_group.command(name="carregar", description="Carrega o CSV enviado como anexo")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def carregar_slash(self, interaction: discord.Interaction):
         """Carrega o CSV em anexo na mensagem."""
-        if not ctx.message.attachments:
-            await ctx.send("❌ Envia o ficheiro `.csv` como anexo desta mensagem.")
-            return
-
-        att = ctx.message.attachments[0]
-        if not att.filename.endswith(".csv"):
-            await ctx.send("❌ O ficheiro deve ser `.csv`.")
-            return
-
-        async with ctx.typing():
-            raw = await att.read()
-            try:
-                content = raw.decode("utf-8-sig")
-            except UnicodeDecodeError:
-                content = raw.decode("latin-1")
-
-            try:
-                self.equipas = parse_csv(content)
-                self._save_data()
-            except ValueError as e:
-                await ctx.send(f"❌ Erro no CSV: {e}")
-                return
-
-        total_p = sum(len(e.participantes) for e in self.equipas)
+        # Slash commands don't support file uploads directly in the command
+        # We'll use a modal or fallback to a message-based approach
         embed = discord.Embed(
-            title="✅ CSV Carregado",
-            description=f"**{len(self.equipas)}** equipas · **{total_p}** participantes",
-            color=discord.Color.green(),
+            title="📤 Carregar CSV",
+            description="Para carregar um CSV, envie o arquivo em anexo numa mensagem e reaja com ✅.",
+            color=discord.Color.blue(),
         )
-        for eq in self.equipas[:10]:
-            chefes = ", ".join(c.nome for c in eq.chefes) or "—"
-            embed.add_field(
-                name=f"{eq.nome} — {eq.jogo}",
-                value=f"{len(eq.participantes)} membros | Chefe(s): {chefes}",
-                inline=False,
-            )
-        if len(self.equipas) > 10:
-            embed.set_footer(text=f"… e mais {len(self.equipas) - 10} equipas")
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # ── !playnesti status ──────────────────────────────────────────────────────
-
-    @playnesti.command(name="status")
-    @commands.has_permissions(manage_roles=True)
-    async def status(self, ctx: commands.Context):
+    @playnesti_group.command(name="status", description="Mostra quem está e quem não está no servidor")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def status_slash(self, interaction: discord.Interaction):
         """Mostra quem está e quem não está no servidor."""
         if not self.equipas:
-            await ctx.send("⚠️ Nenhum CSV carregado. Usa `!playnesti carregar`.")
+            await interaction.response.send_message("⚠️ Nenhum CSV carregado. Use `/playnesti carregar` primeiro.", ephemeral=True)
             return
 
-        guild = ctx.guild
+        guild = interaction.guild
         ausentes, presentes = [], []
 
         for eq in self.equipas:
@@ -1325,20 +1282,18 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
         if len(ausentes) > 15:
             embed.add_field(name="", value=f"… e mais {len(ausentes)-15}", inline=False)
 
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
-    # ── !playnesti criar_cargos ────────────────────────────────────────────────
-
-    @playnesti.command(name="criarcargos")
-    @commands.has_permissions(manage_roles=True)
-    async def criar_cargos(self, ctx: commands.Context):
+    @playnesti_group.command(name="criarcargos", description="Cria e atribui cargos automaticamente")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def criar_cargos_slash(self, interaction: discord.Interaction):
         """Cria cargos de equipa e de chefe, e atribui aos membros encontrados."""
         if not self.equipas:
-            await ctx.send("⚠️ Nenhum CSV carregado. Usa `!playnesti carregar`.")
+            await interaction.response.send_message("⚠️ Nenhum CSV carregado. Use `/playnesti carregar` primeiro.", ephemeral=True)
             return
 
-        guild = ctx.guild
-        msg = await ctx.send("⏳ A criar cargos e atribuir participantes…")
+        await interaction.response.defer()
+        guild = interaction.guild
 
         resultados = {
             "cargos_criados": [],
@@ -1424,15 +1379,13 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
                 value="\n".join(resultados["erros"][:10]),
                 inline=False,
             )
-        await msg.edit(content=None, embed=embed)
+        await interaction.followup.send(embed=embed)
 
-    # ── !playnesti dashboard ───────────────────────────────────────────────────
-
-    @playnesti.command(name="dash")
-    async def dashboard_cmd(self, ctx: commands.Context):
+    @playnesti_group.command(name="dashboard", description="Mostra o URL do dashboard web")
+    async def dashboard_slash(self, interaction: discord.Interaction):
         """Mostra o URL do dashboard web."""
         if not FLASK_AVAILABLE:
-            await ctx.send("❌ Flask não instalado. Instala com `pip install flask flask-cors`.")
+            await interaction.response.send_message("❌ Flask não instalado. Instala com `pip install flask flask-cors`.", ephemeral=True)
             return
         embed = discord.Embed(
             title="🌐 Dashboard PlayNESTI",
@@ -1449,21 +1402,19 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
             "• Cards por equipa com progresso de presença\n"
             "• Importar novo CSV directamente pelo browser"
         ))
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # ── !playnesti limpar ──────────────────────────────────────────────────────
-
-    @playnesti.command(name="limpar")
-    @commands.has_permissions(manage_roles=True)
-    async def limpar(self, ctx: commands.Context):
+    @playnesti_group.command(name="limpar", description="Remove todos os cargos criados pelo bot")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def limpar_slash(self, interaction: discord.Interaction):
         """Remove todos os cargos criados pelo bot neste servidor."""
-        guild = ctx.guild
+        guild = interaction.guild
         role_ids = self.created_roles.get(guild.id, [])
         if not role_ids:
-            await ctx.send("Não há cargos registados para remover.")
+            await interaction.response.send_message("Não há cargos registados para remover.", ephemeral=True)
             return
 
-        msg = await ctx.send(f"A remover {len(role_ids)} cargos…")
+        await interaction.response.defer()
         removed, errors = 0, 0
         for rid in role_ids:
             role = guild.get_role(rid)
@@ -1475,13 +1426,60 @@ class PlayNESTI(commands.Cog, name="PlayNESTI"):
                     errors += 1
         self.created_roles[guild.id] = []
         self._save_data()
-        await msg.edit(content=f"✅ {removed} cargos removidos" + (f" ({errors} erros)" if errors else "") + ".")
+        result = f"✅ {removed} cargos removidos" + (f" ({errors} erros)" if errors else "") + "."
+        await interaction.followup.send(result)
 
     # ── Listeners ─────────────────────────────────────────────────────────────
 
     @commands.Cog.listener()
     async def on_ready(self):
         log.info(f"[PlayNESTI] Cog pronto. {len(self.equipas)} equipas em memória.")
+
+    # ── Message attachment listener for CSV upload ────────────────────────────
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Listen for CSV uploads in a specific channel for PlayNESTI management."""
+        # Skip bot messages and DMs
+        if message.author.bot or not message.guild:
+            return
+
+        # Only respond to users with manage_roles permission
+        if not message.author.guild_permissions.manage_roles:
+            return
+
+        # Check for CSV attachments in a designated management channel
+        # (optional: could add env var for this)
+        for attachment in message.attachments:
+            if attachment.filename.endswith(".csv"):
+                try:
+                    raw = await attachment.read()
+                    try:
+                        content = raw.decode("utf-8-sig")
+                    except UnicodeDecodeError:
+                        content = raw.decode("latin-1")
+
+                    self.equipas = parse_csv(content)
+                    self._save_data()
+
+                    total_p = sum(len(e.participantes) for e in self.equipas)
+                    embed = discord.Embed(
+                        title="✅ CSV Carregado",
+                        description=f"**{len(self.equipas)}** equipas · **{total_p}** participantes",
+                        color=discord.Color.green(),
+                    )
+                    for eq in self.equipas[:10]:
+                        chefes = ", ".join(c.nome for c in eq.chefes) or "—"
+                        embed.add_field(
+                            name=f"{eq.nome} — {eq.jogo}",
+                            value=f"{len(eq.participantes)} membros | Chefe(s): {chefes}",
+                            inline=False,
+                        )
+                    if len(self.equipas) > 10:
+                        embed.set_footer(text=f"… e mais {len(self.equipas) - 10} equipas")
+                    await message.reply(embed=embed)
+                except ValueError as e:
+                    await message.reply(f"❌ Erro no CSV: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

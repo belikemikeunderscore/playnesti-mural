@@ -130,12 +130,16 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   try {
     const response = await fetch('/auth/login', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
 
     if (response.ok) {
-      window.location.href = '/moderation';
+      // ensure cookie is stored before navigating
+      await response.text();
+      // slight delay to let the browser persist cookies
+      setTimeout(() => { window.location.href = '/moderation'; }, 120);
     } else {
       errorDiv.textContent = 'Senha incorreta';
       errorDiv.classList.add('show');

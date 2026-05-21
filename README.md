@@ -65,6 +65,7 @@ Create a `.env` file in the repository root and add your environment-specific va
 ```dotenv
 DISCORD_TOKEN=YOUR_DISCORD_BOT_TOKEN
 MEDIA_CHANNEL_ID=123456789012345678
+LFT_ANNOUNCEMENT_CHANNEL_ID=123456789012345678
 WEB_HOST=localhost
 WEB_PORT=8080
 MODERATION_PASSWORD=your_password_here
@@ -76,6 +77,7 @@ Important:
 
 - Replace `DISCORD_TOKEN` with your bot token.
 - Set `MEDIA_CHANNEL_ID` to the channel ID where media submissions are accepted.
+- Set `LFT_ANNOUNCEMENT_CHANNEL_ID` to the channel ID where LFT announcements should be posted.
 - Change `MODERATION_PASSWORD` to secure the moderation interface.
 - `VR_BRIDGE_TOKEN` and `VR_BRIDGE_PORT` are used by the VR Expo bridge.
 
@@ -165,18 +167,17 @@ The bridge will resolve the Discord user and send a DM with the waitlist notific
 
 ## PlayNESTI LAN Party Commands
 
-The role manager cog registers the `!discord` command group.
+All PlayNESTI commands are slash commands and require admin permission (`manage_roles`).
 
-Available commands:
+Available commands (use `/playnesti <command>`):
 
-- `!discord` — shows the PlayNESTI command overview
-- `!discord carregar` — upload a CSV attachment to import team data
-- `!discord status` — show which participants are present or absent
-- `!discord criarcargos` — create team roles and assign members
-- `!discord dash` — display the local dashboard URL
-- `!discord limpar` — remove roles created by the bot for this guild
+- `/playnesti carregar` — import team data from a CSV file (attach CSV to the message with the command)
+- `/playnesti status` — show which participants are present or absent on the server
+- `/playnesti criarcargos` — create team roles and automatically assign members based on imported data
+- `/playnesti dashboard` — display the local web dashboard URL for managing roles and viewing team data
+- `/playnesti limpar` — remove all roles created by the bot for this guild
 
-> Note: the dashboard command is implemented as `!discord dash` in the current code.
+> Note: These are modern Discord slash commands that only visible to and usable by users with the `manage_roles` permission (typically admins).
 
 ### CSV Support
 

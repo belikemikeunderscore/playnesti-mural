@@ -112,7 +112,7 @@ class MediaWall(commands.Cog):
             await message.delete()
             try:
                 await message.author.send(
-                    f"❌ O canal **#{message.channel.name}** só aceita mensagens com imagens ou vídeos."
+                    f"❌ O mural só aceita mensagens com imagens ou vídeos!"
                 )
             except discord.Forbidden:
                 pass

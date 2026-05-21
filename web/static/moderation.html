@@ -144,15 +144,24 @@ const itemList = document.getElementById('item-list');
 
 let ws;
 let items = [];
+let gotInit = false;
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
 
   ws.onopen = () => wsStatus.className = 'ws-status connected';
 
+  // If we don't receive an initial state within 1.2s, assume empty
+  setTimeout(() => {
+    if (!gotInit) {
+      queueStatus.textContent = `Total de itens: 0`;
+    }
+  }, 1200);
+
   ws.onmessage = ({ data }) => {
     const msg = JSON.parse(data);
     if (msg.type === 'init') {
+      gotInit = true;
       items = msg.items;
       renderItems();
     } else if (msg.type === 'add') {
