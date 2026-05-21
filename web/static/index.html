@@ -3,9 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PlayNESTI 26 — Wall</title>
+<title>PlayNESTI 26 — Mural</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap');
+
+  @font-face {
+    font-family: 'Coolvetica';
+    src: url('/static/CoolveticaRg.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,7 +32,7 @@
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Coolvetica', sans-serif;
   }
 
   /* ─── IDLE SCREEN ─── */
@@ -45,22 +52,13 @@
   #idle.out { opacity: 0; pointer-events: none; }
 
   .idle-logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(4rem, 10vw, 9rem);
-    letter-spacing: 0.04em;
-    line-height: 1;
-    color: var(--text);
-  }
-
-  .idle-logo em {
-    color: var(--red);
-    font-style: normal;
+    max-width: clamp(300px, 75vw, 900px);
+    height: auto;
+    object-fit: contain;
   }
 
   .idle-sub {
-    font-size: 0.85rem;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
+    font-size: 1rem;
     color: var(--muted);
   }
 
@@ -98,6 +96,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: opacity var(--fade);
   }
 
   #media-wrap img,
@@ -129,12 +128,16 @@
     border-radius: 2px;
   }
 
-  .caption-text { display: flex; flex-direction: column; gap: 3px; }
+  .caption-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+  }
 
   #cap-author {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Coolvetica', sans-serif;
     font-size: 1.4rem;
-    letter-spacing: 0.08em;
     color: var(--red);
     line-height: 1;
   }
@@ -148,6 +151,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-height: 1.1rem;
   }
 
   /* ─── PROGRESS BAR ─── */
@@ -168,8 +172,6 @@
     top: 18px;
     right: 20px;
     font-size: 0.7rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--muted);
     background: rgba(255,255,255,0.04);
     border: 1px solid #222;
@@ -186,15 +188,25 @@
     position: fixed;
     top: 18px;
     left: 20px;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.1rem;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    z-index: 20;
-    opacity: 0.5;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-family: 'Coolvetica', sans-serif;
+    font-size: 0.75rem;
+    color: var(--text);
+    z-index: 22;
+    max-width: 250px;
+    line-height: 1.4;
   }
 
-  #corner span { color: var(--red); opacity: 1; }
+  #corner .red { color: var(--red); }
+
+  #qr-code {
+    margin-top: 10px;
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+  }
 
   /* ─── WS STATUS DOT ─── */
   #ws-dot {
@@ -211,15 +223,32 @@
 
   #ws-dot.connected { background: #2ecc71; }
   #ws-dot.error { background: var(--red); }
+
+  /* ─── VIDEO TIMER ─── */
+  #video-timer {
+    position: fixed;
+    top: 18px;
+    right: 20px;
+    font-family: 'Coolvetica', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text);
+    display: none;
+    z-index: 21;
+  }
+
+  #video-timer.visible { display: block; }
 </style>
 </head>
 <body>
 
-<div id="corner">Play<span>NESTI</span> 26</div>
+<div id="corner">
+  Envia as tuas fotos para o <span class="red">#mural-playnesti26</span> no nosso Discord
+  <img id="qr-code" src="/static/qr-code.png" alt="QR Code">
+</div>
 
 <div id="idle">
-  <div class="idle-logo">Play<em>NESTI</em></div>
-  <div class="idle-sub">A aguardar conteúdo</div>
+  <img src="/static/logo.png" alt="PlayNESTI" class="idle-logo">
+  <div class="idle-sub">Envia as tuas fotos para o #mural-playnesti26 no nosso Discord</div>
   <div class="idle-dot"></div>
 </div>
 
@@ -236,6 +265,7 @@
 </div>
 
 <div id="queue-badge"></div>
+<div id="video-timer"></div>
 <div id="ws-dot"></div>
 
 <script>
@@ -249,10 +279,31 @@ const capAuthor  = document.getElementById('cap-author');
 const capMsg     = document.getElementById('cap-msg');
 const progressEl = document.getElementById('progress');
 const badge      = document.getElementById('queue-badge');
+const timerEl    = document.getElementById('video-timer');
 const wsDot      = document.getElementById('ws-dot');
 
 const queue = [];
+const allItems = [];
+const allItemIds = new Set();
 let running = false;
+let currentItemId = null;
+let currentMessageId = null;
+let rotationIndex = 0;
+let timerInterval = null;
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function hideTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  timerEl.classList.remove('visible');
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -299,27 +350,67 @@ function buildMedia(item) {
     const img = document.createElement('img');
     img.src = item.url;
     mediaWrap.appendChild(img);
-    return null;
+    return new Promise(resolve => {
+      if (img.complete) {
+        resolve(null);
+      } else {
+        img.onload = () => resolve(null);
+        img.onerror = () => resolve(null);
+      }
+    });
   }
 
   const vid = document.createElement('video');
   vid.src = item.url;
-  vid.autoplay = true;
   vid.playsInline = true;
   vid.controls = false;
   mediaWrap.appendChild(vid);
-  return vid;
+  return new Promise(resolve => {
+    if (vid.readyState >= 1) {
+      resolve(vid);
+    } else {
+      vid.oncanplay = () => resolve(vid);
+      vid.onerror = () => resolve(vid);
+    }
+  });
 }
 
 function waitForItem(item, vid) {
   return new Promise(resolve => {
     if (item.type === 'image') {
+      hideTimer();
       startProgress(IMAGE_DURATION);
       setTimeout(resolve, IMAGE_DURATION);
       return;
     }
+    
     let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
+    const finish = () => { if (!done) { done = true; hideTimer(); resolve(); } };
+    
+    const onCanPlay = () => {
+      const duration = vid.duration;
+      if (duration && isFinite(duration)) {
+        startProgress(duration * 1000);
+        
+        // Show timer and update it
+        timerEl.classList.add('visible');
+        if (timerInterval) clearInterval(timerInterval);
+        
+        timerInterval = setInterval(() => {
+          const remaining = vid.duration - vid.currentTime;
+          if (remaining > 0) {
+            timerEl.textContent = formatTime(remaining);
+          }
+        }, 100);
+      }
+    };
+    
+    if (vid.readyState >= 2) {
+      onCanPlay();
+    } else {
+      vid.addEventListener('canplay', onCanPlay, { once: true });
+    }
+    
     vid.addEventListener('ended', finish, { once: true });
     vid.addEventListener('error', finish, { once: true });
     setTimeout(finish, 120_000);
@@ -328,46 +419,121 @@ function waitForItem(item, vid) {
 }
 
 async function displayItem(item) {
-  const vid = buildMedia(item);
+  const sameMessage = item.message_id && item.message_id === currentMessageId;
+  const vidPromise = buildMedia(item);
+  const vid = await vidPromise;
 
-  capAuthor.textContent = item.author || '';
-  capMsg.textContent = item.text || '';
-  capMsg.style.display = item.text ? '' : 'none';
+  if (!sameMessage) {
+    capAuthor.textContent = item.author || '';
+    capMsg.textContent = item.text || '';
+    capMsg.style.visibility = item.text ? 'visible' : 'hidden';
+  }
 
-  await showIdle(false);
-  await fadeIn();
+  currentItemId = item.id;
+  currentMessageId = item.message_id || null;
+
+  if (!sameMessage) {
+    await showIdle(false);
+    await fadeIn();
+    await waitForItem(item, vid);
+    await fadeOut();
+    return;
+  }
+
+  // Same message group: ensure slide is visible, then swap media
+  if (!slideEl.classList.contains('visible')) {
+    slideEl.classList.add('visible');
+    await sleep(FADE_MS);
+  }
+  mediaWrap.style.opacity = '0';
+  await sleep(FADE_MS);
+  mediaWrap.style.opacity = '1';
   await waitForItem(item, vid);
-  await fadeOut();
+}
+
+function getNextItem() {
+  if (queue.length > 0) {
+    return queue.shift();
+  }
+
+  // Cycle through all stored items in order to avoid repeats.
+  if (allItems.length > 0) {
+    const item = allItems[rotationIndex % allItems.length];
+    rotationIndex += 1;
+    return item;
+  }
+
+  return null;
 }
 
 async function runQueue() {
   if (running) return;
   running = true;
 
-  while (queue.length > 0) {
-    updateBadge();
-    await displayItem(queue.shift());
-  }
+  await showIdle(true);
+  await sleep(1000);
 
-  running = false;
-  updateBadge();
-  showIdle(true);
+  while (true) {
+    updateBadge();
+    const item = getNextItem();
+    if (item) {
+      await displayItem(item);
+    } else {
+      // No items available - show idle and wait
+      if (!idleEl.classList.contains('out')) {
+        await sleep(1000);
+      } else {
+        await showIdle(true);
+        await sleep(1000);
+      }
+    }
+  }
 }
 
 function addItems(items) {
-  queue.push(...items);
+  const newItems = items.map(item => ({
+    ...item,
+    id: item.url // Use URL as unique ID
+  }));
+
+  newItems.forEach(item => {
+    if (allItemIds.has(item.id)) {
+      return;
+    }
+    allItemIds.add(item.id);
+    allItems.push(item);
+    queue.push(item);
+  });
+
   updateBadge();
   if (!running) runQueue();
 }
 
+function removeItem(itemId) {
+  const idx = allItems.findIndex(item => item.id === itemId);
+  if (idx >= 0) {
+    allItems.splice(idx, 1);
+    allItemIds.delete(itemId);
+    if (idx < rotationIndex) rotationIndex -= 1;
+  }
+
+  const queueIdx = queue.findIndex(item => item.id === itemId);
+  if (queueIdx >= 0) {
+    queue.splice(queueIdx, 1);
+    updateBadge();
+  }
+}
+
 function connect() {
-  const ws = new WebSocket(`ws://${location.host}/ws`);
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
   ws.onopen = () => wsDot.className = 'connected';
 
   ws.onmessage = ({ data }) => {
     const msg = JSON.parse(data);
     if (msg.type === 'init' || msg.type === 'add') addItems(msg.items);
+    if (msg.type === 'remove') removeItem(msg.id);
   };
 
   ws.onclose = () => {

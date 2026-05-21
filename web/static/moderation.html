@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlayNESTI 26 — Moderação do Mural</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap');
+
+  @font-face {
+    font-family: 'Coolvetica';
+    src: url('/static/CoolveticaRg.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c8102e;
+    --bg: #080808;
+    --surface: #111;
+    --text: #f0ece8;
+    --muted: #555;
+  }
+
+  html, body {
+    width: 100vw;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Coolvetica', sans-serif;
+    padding: 20px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--red);
+    margin-bottom: 20px;
+  }
+
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section h2 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .item-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .item {
+    background: var(--surface);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .item img, .item video {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+
+  .item .author {
+    font-weight: bold;
+    color: var(--red);
+  }
+
+  .item .text {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .item .actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  button {
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Coolvetica', sans-serif;
+  }
+
+  button:hover {
+    background: #a00;
+  }
+
+  .queue-status {
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .ws-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #333;
+  }
+
+  .ws-status.connected { background: #2ecc71; }
+  .ws-status.error { background: var(--red); }
+</style>
+</head>
+<body>
+
+<h1>Moderação do Mural</h1>
+
+<div class="section">
+  <h2>Fila de Espera</h2>
+  <div id="queue-status" class="queue-status">Carregando...</div>
+</div>
+
+<div class="section">
+  <h2>Itens Atuais</h2>
+  <div id="item-list" class="item-list"></div>
+</div>
+
+<div id="ws-status" class="ws-status"></div>
+
+<script>
+const wsStatus = document.getElementById('ws-status');
+const queueStatus = document.getElementById('queue-status');
+const itemList = document.getElementById('item-list');
+
+let ws;
+let items = [];
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+
+  ws.onopen = () => wsStatus.className = 'ws-status connected';
+
+  ws.onmessage = ({ data }) => {
+    const msg = JSON.parse(data);
+    if (msg.type === 'init') {
+      items = msg.items;
+      renderItems();
+    } else if (msg.type === 'add') {
+      items.push(...msg.items);
+      renderItems();
+    } else if (msg.type === 'remove') {
+      items = items.filter(item => item.url !== msg.id);
+      renderItems();
+    } else if (msg.type === 'queue_status') {
+      queueStatus.textContent = `Itens na fila: ${msg.count}`;
+    }
+  };
+
+  ws.onclose = () => {
+    wsStatus.className = 'ws-status error';
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function renderItems() {
+  itemList.innerHTML = '';
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'item';
+
+    const media = item.type === 'image' ?
+      `<img src="${item.url}" alt="Media">` :
+      `<video src="${item.url}" controls></video>`;
+
+    div.innerHTML = `
+      ${media}
+      <div class="author">${item.author || 'Anônimo'}</div>
+      <div class="text">${item.text || 'Sem texto'}</div>
+      <div class="actions">
+        <button onclick="deleteItem('${item.url}')">Remover</button>
+      </div>
+    `;
+
+    itemList.appendChild(div);
+  });
+
+  queueStatus.textContent = `Total de itens: ${items.length}`;
+}
+
+function deleteItem(url) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'delete', id: url }));
+  }
+}
+
+connect();
+</script>
+</body>
+</html>

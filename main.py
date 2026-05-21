@@ -8,13 +8,18 @@ from state import AppState
 from web.server import create_app
 
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
+intents.presences = True
+intents.presences = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.state = AppState()
 
 COGS = [
     "cogs.media_wall",
+    "cogs.vr_expo",
+    "cogs.server_role_manager",
 ]
 
 async def main():
@@ -27,6 +32,7 @@ async def main():
     site = web.TCPSite(runner, config.WEB_HOST, config.WEB_PORT)
     await site.start()
     print(f"Wall: http://{config.WEB_HOST}:{config.WEB_PORT}")
+    print(f"Moderation: http://{config.WEB_HOST}:{config.WEB_PORT}/moderation")
 
     await bot.start(config.DISCORD_TOKEN)
 

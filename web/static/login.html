@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlayNESTI 26 — Login</title>
+<style>
+  @font-face {
+    font-family: 'Coolvetica';
+    src: url('/static/CoolveticaRg.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c8102e;
+    --bg: #080808;
+    --surface: #111;
+    --text: #f0ece8;
+    --muted: #555;
+  }
+
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Coolvetica', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-container {
+    background: var(--surface);
+    border: 2px solid var(--red);
+    border-radius: 8px;
+    padding: 40px;
+    width: 100%;
+    max-width: 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    color: var(--red);
+    text-align: center;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  label {
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  input[type="password"] {
+    background: var(--bg);
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'Coolvetica', sans-serif;
+    font-size: 1rem;
+  }
+
+  input[type="password"]:focus {
+    outline: none;
+    border-color: var(--red);
+    box-shadow: 0 0 8px rgba(200, 16, 46, 0.3);
+  }
+
+  button {
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 4px;
+    font-family: 'Coolvetica', sans-serif;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+
+  button:hover {
+    background: #a00;
+  }
+
+  .error {
+    background: rgba(200, 16, 46, 0.2);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    display: none;
+  }
+
+  .error.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="login-container">
+  <h1>Moderação</h1>
+  <form id="login-form">
+    <div class="form-group">
+      <label for="password">Senha</label>
+      <input type="password" id="password" name="password" required autofocus>
+    </div>
+    <button type="submit">Entrar</button>
+  </form>
+  <div id="error" class="error"></div>
+</div>
+
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = document.getElementById('password').value;
+  const errorDiv = document.getElementById('error');
+
+  try {
+    const response = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+
+    if (response.ok) {
+      window.location.href = '/moderation';
+    } else {
+      errorDiv.textContent = 'Senha incorreta';
+      errorDiv.classList.add('show');
+      document.getElementById('password').value = '';
+    }
+  } catch (err) {
+    errorDiv.textContent = 'Erro ao conectar';
+    errorDiv.classList.add('show');
+  }
+});
+</script>
+</body>
+</html>
